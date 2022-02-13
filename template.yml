@@ -1,0 +1,71 @@
+# This is the SAM template that represents the architecture of your serverless application
+# https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-template-basics.html
+
+# The AWSTemplateFormatVersion identifies the capabilities of the template
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/format-version-structure.html
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  aldi-sftp-reader
+
+# Transform section specifies one or more macros that AWS CloudFormation uses to process your template
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/transform-section-structure.html
+Transform:
+- AWS::Serverless-2016-10-31
+
+Parameters:
+   AppBucketName:
+    Type: String
+    Description: "REQUIRED: Unique S3 bucket name to use for the app."
+    Default: "iw-payloads-aldi-edi"
+   
+   AldiEdiFolder: 
+     Type: String
+     Description: "REQUIRED: Unique SFTP dir to list files from"
+     Default: /ALDIS_AU00741
+
+   PollableAldiFolder: 
+     Type: String
+     Description: "REQUIRED: unique SFTP Pollable dir to retrieve files"
+     Default: /ALDIS_AU00741/POLLABLE
+
+# Resources declares the AWS resources that you want to include in the stack
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html
+Resources:  
+  # This is the Lambda function definition associated with the source code: sqs-payload-logger.js. For all available properties, see
+  # https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+  ScheduledEventLogger:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: A Lambda function that logs the payload of messages sent to an associated SQS queue.
+      Runtime: nodejs14.x
+      Architectures:
+        - x86_64
+      Handler: src/handlers/scheduled-event-logger.scheduledEventLoggerHandler
+      # This property associates this Lambda function with a scheduled CloudWatch Event. For all available properties, see
+      # https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#schedule
+      # This example runs every hour.
+      Policies:
+        S3FullAccessPolicy:
+          BucketName: !Ref AppBucketName
+      Events:
+        CloudWatchEvent:
+          Type: Schedule
+          Properties:
+            Schedule: rate(2 minutes)
+      MemorySize: 128
+      Timeout: 100
+      Environment:
+        Variables:
+          AldiEdiSrc: !Ref AldiEdiFolder
+          AldiEdiBucket: !Ref AppBucketName
+          PollableAldiDir: !Ref PollableAldiFolder
+          Username: ALDIS_AU00741
+          Password: t4@spUsa
+          Host: sftp.betagrid.gxs.com
+          Port: '22'
+    
+    
+  AppBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref AppBucketName

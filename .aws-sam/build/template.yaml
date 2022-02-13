@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: aldi-sftp-reader
+Transform:
+- AWS::Serverless-2016-10-31
+Parameters:
+  AppBucketName:
+    Type: String
+    Description: 'REQUIRED: Unique S3 bucket name to use for the app.'
+    Default: iw-payloads-aldi-edi
+  AldiEdiFolder:
+    Type: String
+    Description: 'REQUIRED: Unique SFTP dir to list files from'
+    Default: /ALDIS_AU00741
+  PollableAldiFolder:
+    Type: String
+    Description: 'REQUIRED: unique SFTP Pollable dir to retrieve files'
+    Default: /ALDIS_AU00741/POLLABLE
+Resources:
+  ScheduledEventLogger:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: A Lambda function that logs the payload of messages sent to an
+        associated SQS queue.
+      Runtime: nodejs14.x
+      Architectures:
+      - x86_64
+      Handler: src/handlers/scheduled-event-logger.scheduledEventLoggerHandler
+      Policies:
+        S3FullAccessPolicy:
+          BucketName:
+            Ref: AppBucketName
+      Events:
+        CloudWatchEvent:
+          Type: Schedule
+          Properties:
+            Schedule: rate(2 minutes)
+      MemorySize: 128
+      Timeout: 100
+      Environment:
+        Variables:
+          AldiEdiSrc:
+            Ref: AldiEdiFolder
+          AldiEdiBucket:
+            Ref: AppBucketName
+          PollableAldiDir:
+            Ref: PollableAldiFolder
+          Username: ALDIS_AU00741
+          Password: t4@spUsa
+          Host: sftp.betagrid.gxs.com
+          Port: '22'
+      CodeUri: ScheduledEventLogger
+  AppBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Ref: AppBucketName
